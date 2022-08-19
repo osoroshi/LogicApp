@@ -1,0 +1,33 @@
+# Variables to be configured during pipeline creation/execution
+# workGroupId
+# environment
+# location
+# azureServiceConnectionName
+
+variables: 
+  directory: 'target-two-resources' 
+  resourceGroupUsage: 'target-two'
+
+trigger:
+ branches:
+   include:
+     - master
+ paths:
+   include:
+     - /target-two-resources
+
+stages:
+- stage: Deployment
+  variables: 
+    resourceDirectory: $(Build.Repository.LocalPath)\$(directory)
+  jobs:
+  - template: ../pipeline-templates/deploy-azure.yml
+    parameters: 
+      deploymentMode: Incremental
+      resourceDirectory: $(resourceDirectory)
+      workGroupId: $(workGroupId)
+      environment: $(environment)
+      azureServiceConnectionName: $(azureServiceConnectionName)
+      location: $(location)
+      resourceGroupUsage: $(resourceGroupUsage)
+      instance: $(instance)
