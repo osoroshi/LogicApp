@@ -1,0 +1,157 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "environment": {
+            "type": "string",
+            "defaultValue": "d",
+            "metadata": {
+                "description": "Identifies the deployment environment to use in the name for each created resource."
+            }
+        },
+        "workGroupId": {
+            "type": "string",
+            "metadata": {
+                "description": "Identifier of the working group this template is being executed for"
+            }
+        },
+        "location": {
+            "type": "String",
+            "defaultValue": "[resourceGroup().location]",
+            "metadata": {
+                "description": "The location resources will be deployed to"
+            }
+        },
+        "instance": {
+            "type": "string",
+            "metadata": {
+                "description": "The value that tracks the number of resource group instances"
+            }
+        }
+    },
+    "variables": {
+        "baseName": "[concat(parameters('workGroupId'), parameters('location'), parameters('environment'))]",
+        "baseInstancedName": "[concat(variables('baseName'), parameters('instance'))]",
+        "integrationServiceEnvironmentName": "[concat(variables('baseInstancedName'),'ise')]",
+        "iseResourceGroupName": "[concat(parameters('workGroupId'), '-', parameters('location'), '-', parameters('environment'), '-ise')]",
+        "sharedResourceGroupName": "[concat(parameters('workGroupId'), '-', parameters('location'), '-', parameters('environment'), '-shared')]",
+        "logicAppName": "[concat(variables('baseInstancedName'), 'la-target-one')]",
+        "iseResourceId": "[resourceId(subscription().subscriptionId, variables('iseResourceGroupName'), 'Microsoft.Logic/integrationServiceEnvironments', variables('integrationServiceEnvironmentName'))]",
+        "integrationAccountName": "[concat(variables('baseInstancedName'),'iact')]",
+        "integrationAccountResourceId": "[resourceId(subscription().subscriptionId, variables('iseResourceGroupName'), 'Microsoft.Logic/integrationAccounts', variables('integrationAccountName'))]",
+        "serviceBusName": "[concat(variables('baseName'), 'sbus')]",
+        "operationalWorkspaceName": "[concat(variables('baseName'),'log')]",
+        "baseISEManagedApiId": "[concat('/subscriptions/', subscription().subscriptionId, '/resourceGroups/', variables('iseResourceGroupName'), '/providers/Microsoft.Logic/integrationServiceEnvironments/', variables('integrationServiceEnvironmentName'), '/managedApis/')]",
+        "serviceBusAuthRuleId": "[resourceId(subscription().subscriptionId, variables('sharedResourceGroupName'), 'Microsoft.ServiceBus/namespaces/authorizationRules', variables('serviceBusName'), 'RootManageSharedAccessKey')]",
+        "serviceBusConnectionName": "servicebus",
+        "servicebusInstanceName": "[concat(variables('serviceBusConnectionName'), parameters('instance'))]",
+        "servicebusManagedApiId": "[concat(variables('baseISEManagedApiId'), variables('serviceBusConnectionName'))]",
+        "diagnosticSettingsName": "[concat(variables('logicAppName'), '.Diagnostics')]",
+        "workspaceId": "[resourceId(variables('sharedResourceGroupName'), 'Microsoft.OperationalInsights/workspaces', variables('operationalWorkspaceName'))]"
+    },
+    "resources": [
+        {
+            "type": "Microsoft.Web/connections",
+            "apiVersion": "2016-06-01",
+            "name": "[variables('servicebusInstanceName')]",
+            "location": "[parameters('location')]",
+            "properties": {
+                "displayName": "[variables('servicebusInstanceName')]",
+                "customParameterValues": {
+                },
+                "api": {
+                    "id": "[variables('servicebusManagedApiId')]"
+                },
+                "parameterValues": {
+                    "connectionString": "[listKeys(variables('ServiceBusAuthRuleId'), '2015-08-01').primaryConnectionString]"
+                }
+            }
+        },
+        {
+            "name": "[variables('logicAppName')]",
+            "type": "Microsoft.Logic/workflows",
+            "location": "[parameters('location')]",
+            "apiVersion": "2016-06-01",
+            "dependsOn": [
+                "[resourceId('Microsoft.Web/connections', variables('servicebusInstanceName'))]"
+            ],
+            "properties": {
+                "integrationServiceEnvironment": {
+                    "id": "[variables('iseResourceId')]"
+                },
+                "integrationAccount": {
+                    "id": "[variables('integrationAccountResourceId')]"
+                },
+                "definition": {
+                    "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+                    "actions": {
+                    },
+                    "contentVersion": "1.0.0.0",
+                    "outputs": {
+                    },
+                    "parameters": {
+                        "$connections": {
+                            "defaultValue": {
+                            },
+                            "type": "Object"
+                        }
+                    },
+                    "triggers": {
+                    }
+                },
+                "parameters": {
+                    "$connections": {
+                        "value": {
+                            "servicebus": {
+                                "connectionId": "[resourceId('Microsoft.Web/connections', variables('servicebusInstanceName'))]",
+                                "connectionName": "servicebus",
+                                "id": "[variables('servicebusManagedApiId')]"
+                            }
+                        }
+                    }
+                }
+            },
+            "resources": [
+                {
+                    "type": "Providers/DiagnosticSettings",
+                    "name": "[concat('Microsoft.Insights/', variables('diagnosticSettingsName'))]",
+                    "dependsOn": [
+                        "[resourceId('Microsoft.Logic/workflows', variables('logicAppName'))]"
+                    ],
+                    "apiVersion": "2017-05-01-preview",
+                    "properties": {
+                        "name": "[variables('diagnosticSettingsName')]",
+                        "workspaceId": "[variables('workspaceId')]",
+                        "mode": "Incremental",
+                        "logs": [
+                            {
+                                "category": "WorkflowRuntime",
+                                "enabled": true,
+                                "retentionPolicy": {
+                                    "days": 0,
+                                    "enabled": false
+                                }
+                            }
+                        ],
+                        "metrics": [
+                            {
+                                "timeGrain": "PT1M",
+                                "enabled": true,
+                                "retentionPolicy": {
+                                    "enabled": false,
+                                    "days": 0
+                                }
+                            }
+                        ]
+                    }
+                }
+            ]
+        }
+    ],
+    "outputs": {
+        "logicAppName": {
+            "type": "string",
+            "value": "[variables('logicAppName')]"
+        }
+    }
+}
