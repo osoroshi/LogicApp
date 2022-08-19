@@ -1,0 +1,33 @@
+parameters:
+  deploymentMode: ''
+  resourceDirectory: ''
+  workGroupId: ''
+  environment: ''
+  azureServiceConnectionName: ''
+  location: ''
+  resourceGroupUsage: ''
+  instance: ''
+
+jobs:
+- job: ResourceGroupDeployment
+  variables:
+    templateFilePath: ${{ parameters.resourceDirectory }}\template.json
+    parametersFilePath: ${{ parameters.resourceDirectory }}\parameters-${{ parameters.environment }}${{ parameters.instance }}.json
+    resourceGroupName: ${{ parameters.workGroupId }}-${{ parameters.location }}-${{ parameters.environment }}-${{ parameters.resourceGroupUsage }}
+  pool: 
+    vmImage: 'windows-2019'
+  steps:
+  - task: AzureResourceGroupDeployment@2
+    name: ResourceGroupDeployment
+    inputs:
+      azureSubscription: ${{ parameters.azureServiceConnectionName }}
+      action: 'Create Or Update Resource Group'
+      resourceGroupName: $(resourceGroupName)
+      location: ${{ parameters.location }}
+      templateLocation: Linked artifact
+      csmFile: $(templateFilePath)
+      csmParametersFile: $(parametersFilePath)
+      deploymentMode: ${{ parameters.deploymentMode }}
+      deploymentName: $(Build.BuildNumber)
+      overrideParameters: -environment ${{ parameters.environment }} -workGroupId ${{ parameters.workGroupId }} 
+

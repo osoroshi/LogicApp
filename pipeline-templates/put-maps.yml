@@ -1,0 +1,35 @@
+jobs:
+- template: get-content.yml
+  parameters:
+    name: GET_DigitalReceipts_SAPRCS_AC
+    filePath: $(Build.Repository.LocalPath)/maps/DigitalReceipts_SAPRCS_AC.liquid
+
+- template: get-content.yml
+  parameters:
+    name: GET_DigitalReceipts_SAPRCS_DRS
+    filePath: $(Build.Repository.LocalPath)/maps/DigitalReceipts_SAPRCS_DRS.xslt
+
+- job: PUT_Maps
+  dependsOn: 
+  - GET_DigitalReceipts_SAPRCS_AC
+  - GET_DigitalReceipts_SAPRCS_DRS
+  pool: server
+  variables:
+  - name: ac_content
+    value: $[ dependencies.GET_DigitalReceipts_SAPRCS_AC.outputs['setContentStep.content'] ]
+  - name: drs_content
+    value: $[ dependencies.GET_DigitalReceipts_SAPRCS_DRS.outputs['setContentStep.content'] ]
+  steps:
+  - template: put-map.yml
+    parameters: 
+      mapName: 'DigitalReceipts_SAPRCS_DRS'
+      mapType: "Xslt"
+      content: "$(drs_content)"
+      contentType: "application/xml"
+
+  - template: put-map.yml
+    parameters: 
+      mapName: 'DigitalReceipts_SAPRCS_AC'
+      mapType: "Liquid"
+      content: "$(ac_content)"
+      contentType: "text/plain"

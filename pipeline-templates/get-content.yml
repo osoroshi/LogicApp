@@ -1,0 +1,15 @@
+parameters:
+  name: ''
+  filePath: ''
+
+jobs: 
+- job: ${{ parameters.name }}
+  pool: 
+    vmImage: 'windows-2019'
+  steps:
+  - task: PowerShell@2
+    name: setContentStep
+    inputs:
+      targetType: 'filePath'
+      filePath: '$(Build.Repository.LocalPath)/pipeline/templates/get-map.ps1'
+      arguments: "-filePath ${{ parameters.filePath }}"

@@ -1,0 +1,25 @@
+parameters: 
+  mapName: ''
+  mapType: ''
+  contentType: ''
+  content: ''
+
+steps:
+- task: InvokeRESTAPI@1
+  displayName: 'PUT ${{ parameters.mapName }} Map'
+  inputs:
+    connectionType: 'connectedServiceNameARM'
+    azureServiceConnection: 'Relax://sandbox/deployment/ise'
+    method: 'PUT'
+    body: |
+      {
+        "properties": {
+          "mapType": "${{ parameters.mapType }}",
+          "content": "${{ parameters.content }}",
+          "contentType": "${{ parameters.contentType }}",
+          "metadata": {}
+        },
+        "location": "$(location)"
+      }
+    urlSuffix: 'subscriptions/$(subscriptionId)/resourceGroups/$(iseResourceGroupName)$(instance)/providers/Microsoft.Logic/integrationAccounts/$(integrationAccountName)$(instance)/maps/${{ parameters.mapName }}?api-version=2016-06-01'
+    waitForCompletion: 'false'

@@ -1,0 +1,16 @@
+parameters: 
+    sourcePath: ''
+    storageAccountName: ''
+    containerName: ''
+    deploymentMode: ''
+
+steps: 
+- task: AzureFileCopy@3
+  condition: ne('${{ parameters.deploymentMode }}', 'Validation')
+  inputs:
+    sourcePath: ${{ parameters.sourcePath}}
+    azureSubscription: 'Relax://sandbox/deployment/ise'
+    destination: AzureBlob
+    storage: ${{ parameters.storageAccountName }}
+    containerName: ${{ parameters.containerName }}
+    
