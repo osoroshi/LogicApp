@@ -1,0 +1,234 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "environment": {
+            "type": "string",
+            "defaultValue": "d",
+            "metadata": {
+                "description": "Identifies the deployment environment to use in the name for each created resource."
+            }
+        },
+        "workGroupId": {
+            "type": "string",
+            "metadata": {
+                "description": "Identifier of the working group this template is being executed for"
+            }
+        },
+        "subscriptions": {
+            "type": "array",
+            "defaultValue": [
+                "target-one",
+                "target-two"
+            ],
+            "metadata": {
+                "description": "The array of subscriptions to add to the topic"
+            }
+        },
+        "serviceBusSku": {
+            "type": "string",
+            "allowedValues": [
+                "Standard",
+                "Premium"
+            ],
+            "defaultValue": "Premium",
+            "metadata": {
+                "description": "The SKU for the Azure Service Bus namespace"
+            }
+        },
+        "serviceBusCapacity": {
+            "type": "int",
+            "allowedValues": [
+                1,
+                2,
+                4
+            ],
+            "defaultValue": 1,
+            "metadata": {
+                "description": "The specified messaging units for the Azure Service Bus namespace"
+            }
+        },
+        "topicMaxSize": {
+            "type": "int",
+            "defaultValue": 1024,
+            "metadata": {
+                "description": "The maximum size of the Service Bus Topic"
+            }
+        },
+        "location": {
+            "type": "String",
+            "defaultValue": "[resourceGroup().location]",
+            "metadata": {
+                "description": "The location resources will be deployed to"
+            }
+        }
+    },
+    "variables": {
+        "baseName": "[concat(parameters('workGroupId'), parameters('location'), parameters('environment'))]",
+        "servicesBusName": "[concat(variables('baseName'), 'sbus')]",
+        "operationalWorkspaceName": "[concat(variables('baseName'),'log')]",
+        "vnetResourceGroupName": "[concat(parameters('workGroupId'),'-', parameters('location'), '-', parameters('environment'), '-vnet')]",
+        "vnetName1": "[concat(variables('baseName'), '-1vnet')]",
+        "vnetName2": "[concat(variables('baseName'), '-2vnet')]",
+        "namespaceVirtualNetworkRuleId1": "[resourceId(variables('vnetResourceGroupName'), 'Microsoft.Network/virtualNetworks', variables('vnetName1'))]",
+        "namespaceVirtualNetworkRuleId2": "[resourceId(variables('vnetResourceGroupName'), 'Microsoft.Network/virtualNetworks', variables('vnetName2'))]",
+        "topicName": "t_ingestion"
+    },
+    "resources": [
+        {
+            "name": "[variables('servicesBusName')]",
+            "type": "Microsoft.ServiceBus/namespaces",
+            "apiVersion": "2017-04-01",
+            "location": "[parameters('location')]",
+            "sku": {
+                "name": "[parameters('serviceBusSku')]",
+                "tier": "[parameters('serviceBusSku')]",
+                "capacity": "[parameters('serviceBusCapacity')]"
+            },
+            "properties": {
+            },
+            "resources": [
+            ]
+        },
+        {
+            "name": "[concat(variables('servicesBusName'), '/', variables('topicName'))]",
+            "type": "Microsoft.ServiceBus/namespaces/topics",
+            "apiVersion": "2017-04-01",
+            "dependsOn": [
+                "[resourceId('Microsoft.ServiceBus/namespaces', variables('servicesBusName'))]"
+            ],
+            "properties": {
+                "defaultMessageTimeToLive": "P14D",
+                "maxSizeInMegabytes": "[parameters('topicMaxSize')]",
+                "requiresDuplicateDetection": false,
+                "duplicateDetectionHistoryTimeWindow": "PT10M",
+                "enableBatchedOperations": true,
+                "supportOrdering": true,
+                "autoDeleteOnIdle": "P10675199DT2H48M5.4775807S",
+                "enablePartitioning": false,
+                "enableExpress": false
+            },
+            "resources": [
+            ]
+        },
+        {
+            "name": "[concat(variables('servicesBusName'), '/', variables('topicName'), '/', parameters('subscriptions')[copyIndex()])]",
+            "type": "Microsoft.ServiceBus/namespaces/topics/subscriptions",
+            "apiVersion": "2017-04-01",
+            "copy": {
+                "name": "subscriptionCopy",
+                "count": "[length(parameters('subscriptions'))]"
+            },
+            "dependsOn": [
+                "[resourceId('Microsoft.ServiceBus/namespaces', variables('servicesBusName'))]",
+                "[resourceId('Microsoft.ServiceBus/namespaces/topics', variables('servicesBusName'), variables('topicName'))]"
+            ],
+            "properties": {
+                "lockDuration": "PT30S",
+                "requiresSession": false,
+                "defaultMessageTimeToLive": "P14D",
+                "deadLetteringOnMessageExpiration": true,
+                "deadLetteringOnFilterEvaluationExceptions": true,
+                "maxDeliveryCount": 10,
+                "status": "Active",
+                "enableBatchedOperations": false,
+                "autoDeleteOnIdle": "P10675199DT2H48M5.4775807S"
+            },
+            "resources": [
+            ]
+        },
+        {
+            "type": "Microsoft.ServiceBus/namespaces/NetworkRuleSets",
+            "apiVersion": "2017-04-01",
+            "name": "[concat(variables('servicesBusName'), '/default')]",
+            "location": "[parameters('location')]",
+            "dependsOn": [
+                "[resourceId('Microsoft.ServiceBus/namespaces', variables('servicesBusName'))]"
+            ],
+            "properties": {
+                "defaultAction": "Deny",
+                "ipRules": [
+                ],
+                "virtualNetworkRules": [
+                    {
+                        "subnet": {
+                            "id": "[concat(variables('namespaceVirtualNetworkRuleId1'), '/subnets/Subnet1')]"
+                        },
+                        "ignoreMissingVnetServiceEndpoint": false
+                    },
+                    {
+                        "subnet": {
+                            "id": "[concat(variables('namespaceVirtualNetworkRuleId1'), '/subnets/Subnet2')]"
+                        },
+                        "ignoreMissingVnetServiceEndpoint": false
+                    },
+                    {
+                        "subnet": {
+                            "id": "[concat(variables('namespaceVirtualNetworkRuleId1'), '/subnets/Subnet3')]"
+                        },
+                        "ignoreMissingVnetServiceEndpoint": false
+                    },
+                    {
+                        "subnet": {
+                            "id": "[concat(variables('namespaceVirtualNetworkRuleId1'), '/subnets/Subnet4')]"
+                        },
+                        "ignoreMissingVnetServiceEndpoint": false
+                    },
+                    {
+                        "subnet": {
+                            "id": "[concat(variables('namespaceVirtualNetworkRuleId2'), '/subnets/Subnet1')]"
+                        },
+                        "ignoreMissingVnetServiceEndpoint": false
+                    },
+                    {
+                        "subnet": {
+                            "id": "[concat(variables('namespaceVirtualNetworkRuleId2'), '/subnets/Subnet2')]"
+                        },
+                        "ignoreMissingVnetServiceEndpoint": false
+                    },
+                    {
+                        "subnet": {
+                            "id": "[concat(variables('namespaceVirtualNetworkRuleId2'), '/subnets/Subnet3')]"
+                        },
+                        "ignoreMissingVnetServiceEndpoint": false
+                    },
+                    {
+                        "subnet": {
+                            "id": "[concat(variables('namespaceVirtualNetworkRuleId2'), '/subnets/Subnet4')]"
+                        },
+                        "ignoreMissingVnetServiceEndpoint": false
+                    }
+                ]
+            }
+        },
+        {
+            "type": "Microsoft.ServiceBus/namespaces/AuthorizationRules",
+            "name": "[concat(variables('servicesBusName'), '/', 'RootManageSharedAccessKey')]",
+            "apiVersion": "2017-04-01",
+            "location": "[parameters('location')]",
+            "dependsOn": [
+                "[resourceId('Microsoft.ServiceBus/namespaces', variables('servicesBusName'))]"
+            ],
+            "properties": {
+                "rights": [
+                    "Listen",
+                    "Manage",
+                    "Send"
+                ]
+            }
+        },
+        {
+            "type": "Microsoft.OperationalInsights/workspaces",
+            "apiVersion": "2015-11-01-preview",
+            "name": "[variables('operationalWorkspaceName')]",
+            "location": "[parameters('location')]",
+            "properties": {
+                "source": "Azure",
+                "sku": {
+                    "name": "PerGB2018"
+                },
+                "retentionInDays": 30
+            }
+        }
+    ]
+}
