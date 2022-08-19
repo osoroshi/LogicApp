@@ -1,0 +1,89 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "environment": {
+            "type": "string",
+            "defaultValue": "d",
+            "metadata": {
+                "description": "Identifies the deployment environment to use in the name for each created resource."
+            }
+        },
+        "workGroupId": {
+            "type": "string",
+            "metadata": {
+                "description": "Identifier of the working group this template is being executed for"
+            }
+        },
+        "keyVaultSku": {
+            "type": "object",
+            "defaultValue": {
+                "family": "A",
+                "name": "Standard"
+            },
+            "metadata": {
+                "description": "The SKU used for the Key Vault. Properties for the SKU are Family and Name."
+            }
+        },
+        "location": {
+            "type": "String",
+            "defaultValue": "[resourceGroup().location]",
+            "metadata": {
+                "description": "The location resources will be deployed to"
+            }
+        }
+    },
+    "variables": {
+        "baseName": "[concat(parameters('workGroupId'), parameters('location'), parameters('environment'))]",
+        "keyVaultName": "[take(concat(variables('baseName'), 'kvlt'), 24)]",
+        "storageAccountName": "[take(toLower(concat(variables('baseName'),'sa2')), 24)]"
+    },
+    "resources": [
+        {
+            "name": "[variables('keyVaultName')]",
+            "type": "Microsoft.KeyVault/vaults",
+            "apiVersion": "2018-02-14",
+            "location": "[parameters('location')]",
+            "properties": {
+                "enabledForDeployment": true,
+                "enabledForDiskEncryption": true,
+                "enabledForTemplateDeployment": true,
+                "enablePurgeProtection": true,
+                "tenantId": "[subscription().tenantId]",
+                "sku": "[parameters('keyVaultSku')]",
+                "accessPolicies": [
+                ]
+            },
+            "resources": [
+            ]
+        },
+        {
+            "name": "[variables('storageAccountName')]",
+            "type": "Microsoft.Storage/storageAccounts",
+            "apiVersion": "2019-04-01",
+            "sku": {
+                "name": "Standard_LRS"
+            },
+            "kind": "StorageV2",
+            "location": "[parameters('location')]",
+            "properties": {
+                "accessTier": "Hot"
+            },
+            "resources": [
+            ]
+        },
+        {
+            "name": "[concat(variables('storageAccountName'), '/default/ingestion')]",
+            "type": "Microsoft.Storage/storageAccounts/blobServices/containers",
+            "apiVersion": "2019-04-01",
+            "dependsOn": [
+                "[resourceId('Microsoft.Storage/storageAccounts', variables('storageAccountName'))]"
+            ],
+            "properties": {
+                "publicAccess": "Container"
+            },
+            "resources": [
+            ]
+        }
+    ]
+}

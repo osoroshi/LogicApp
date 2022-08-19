@@ -1,0 +1,32 @@
+# Variables to be configured during pipeline creation/execution
+# workGroupId
+# environment
+# location
+# azureServiceConnectionName
+
+variables: 
+  directory: 'internal-system-resources'
+  resourceGroupUsage: 'internal'
+
+trigger:
+ branches:
+   include:
+     - master
+ paths:
+   include:
+     - /internal-system-resources
+
+stages:
+- stage: Validation
+  variables: 
+    resourceDirectory: $(Build.Repository.LocalPath)\$(directory)
+  jobs:
+  - template: ../pipeline-templates/deploy-azure.yml
+    parameters: 
+      deploymentMode: Incremental
+      resourceDirectory: $(resourceDirectory)
+      workGroupId: $(workGroupId)
+      environment: $(environment)
+      azureServiceConnectionName: $(azureServiceConnectionName)
+      location: $(location)
+      resourceGroupUsage: $(resourceGroupUsage)
