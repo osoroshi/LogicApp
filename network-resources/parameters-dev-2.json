@@ -1,0 +1,24 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentParameters.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "vnetAddressPrefix": {
+            "value": "10.1.0.0/22"
+        },
+        "subnet1Prefix": {
+            "value": "10.1.1.0/26"
+        },
+        "subnet2Prefix": {
+            "value": "10.1.1.64/26"
+        },
+        "subnet3Prefix": {
+            "value": "10.1.1.128/26"
+        },
+        "subnet4Prefix": {
+            "value": "10.1.1.192/26"
+        },
+        "instance": {
+            "value": "-2"
+        }
+    }
+  }

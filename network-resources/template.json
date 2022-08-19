@@ -1,0 +1,187 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "environment": {
+      "type": "string",
+      "defaultValue": "dev",
+      "metadata": {
+        "description": "Identifies the deployment environment to use in the name for each created resource."
+      }
+    },
+    "workGroupId": {
+      "type": "string",
+      "metadata": {
+        "description": "Identifier of the working group this template is being executed for"
+      }
+    },
+    "instance": {
+      "type": "string",
+      "metadata": {
+        "description": "Indicates the specific instance of resources to deploy"
+      }
+    },
+    "location": {
+      "defaultValue": "[resourceGroup().location]",
+      "type": "string",
+      "metadata": {
+        "description": "Location for all resources."
+      }
+    },
+    "vnetAddressPrefix": {
+      "type": "string",
+      "metadata": {
+        "description": "The VNET address prefix. For example, 10.0.0.0/22."
+      }
+    },
+    "subnet1Prefix": {
+      "type": "string",
+      "metadata": {
+        "description": "The prefix for the first ISE subnet. For example, 10.0.1.0/26."
+      }
+    },
+    "subnet2Prefix": {
+      "type": "string",
+      "metadata": {
+        "description": "The prefix for the second ISE subnet. For example, 10.0.1.64/26."
+      }
+    },
+    "subnet3Prefix": {
+      "type": "string",
+      "metadata": {
+        "description": "The prefix for the third ISE subnet. For example, 10.0.1.128/26."
+      }
+    },
+    "subnet4Prefix": {
+      "type": "string",
+      "metadata": {
+        "description": "The prefix for the fourth ISE subnet. For example, 10.0.1.192/26."
+      }
+    },
+    "rebuildVNET": {
+      "type": "bool",
+      "defaultValue": true,
+      "metadata": {
+        "description": "After the first deployment, you don't need to recreate the VNET. When set to false this will skip the VNET and subnet deployment."
+      }
+    }
+  },
+  "variables": {
+    "baseName": "[concat(parameters('workGroupId'), parameters('location'), parameters('environment'))]",
+    "baseInstancedName": "[concat(variables('baseName'), parameters('instance'))]",
+    "vnetName": "[concat(variables('baseInstancedName'), 'vnet')]"
+  },
+  "resources": [
+    {
+      "condition": "[parameters('rebuildVNET')]",
+      "apiVersion": "2018-10-01",
+      "type": "Microsoft.Network/virtualNetworks",
+      "name": "[variables('vnetName')]",
+      "location": "[parameters('location')]",
+      "properties": {
+        "addressSpace": {
+          "addressPrefixes": [
+            "[parameters('vnetAddressPrefix')]"
+          ]
+        }
+      },
+      "resources": [
+        {
+          "condition": "[parameters('rebuildVNET')]",
+          "apiVersion": "2018-10-01",
+          "type": "subnets",
+          "location": "[parameters('location')]",
+          "name": "Subnet1",
+          "dependsOn": [
+            "[resourceId('Microsoft.Network/virtualNetworks', variables('vnetName'))]"
+          ],
+          "properties": {
+            "addressPrefix": "[parameters('subnet1Prefix')]",
+            "serviceEndpoints": [
+              {
+                "service": "Microsoft.ServiceBus",
+                "locations": [
+                  "*"
+                ]
+              }
+            ],
+            "delegations": [
+              {
+                "name": "integrationServiceEnvironments",
+                "properties": {
+                  "serviceName": "Microsoft.Logic/integrationServiceEnvironments"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "condition": "[parameters('rebuildVNET')]",
+          "apiVersion": "2018-10-01",
+          "type": "subnets",
+          "location": "[parameters('location')]",
+          "name": "Subnet2",
+          "dependsOn": [
+            "[concat('Microsoft.Network/virtualNetworks/', variables('vnetName'))]",
+            "[concat('Microsoft.Network/virtualNetworks/', variables('vnetName'), '/subnets/Subnet1')]"
+          ],
+          "properties": {
+            "addressPrefix": "[parameters('subnet2Prefix')]",
+            "serviceEndpoints": [
+              {
+                "service": "Microsoft.ServiceBus",
+                "locations": [
+                  "*"
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "condition": "[parameters('rebuildVNET')]",
+          "apiVersion": "2018-10-01",
+          "type": "subnets",
+          "location": "[parameters('location')]",
+          "name": "Subnet3",
+          "dependsOn": [
+            "[concat('Microsoft.Network/virtualNetworks/', variables('vnetName'))]",
+            "[concat('Microsoft.Network/virtualNetworks/', variables('vnetName'), '/subnets/Subnet2')]"
+          ],
+          "properties": {
+            "addressPrefix": "[parameters('subnet3Prefix')]",
+            "serviceEndpoints": [
+              {
+                "service": "Microsoft.ServiceBus",
+                "locations": [
+                  "*"
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "condition": "[parameters('rebuildVNET')]",
+          "apiVersion": "2018-10-01",
+          "type": "subnets",
+          "location": "[parameters('location')]",
+          "name": "Subnet4",
+          "dependsOn": [
+            "[concat('Microsoft.Network/virtualNetworks/', variables('vnetName'))]",
+            "[concat('Microsoft.Network/virtualNetworks/', variables('vnetName'), '/subnets/Subnet3')]"
+          ],
+          "properties": {
+            "addressPrefix": "[parameters('subnet4Prefix')]",
+            "serviceEndpoints": [
+              {
+                "service": "Microsoft.ServiceBus",
+                "locations": [
+                  "*"
+                ]
+              }
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}
