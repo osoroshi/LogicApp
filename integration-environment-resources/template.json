@@ -1,0 +1,142 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "environment": {
+            "type": "string",
+            "defaultValue": "d",
+            "metadata": {
+                "description": "Identifies the deployment environment to use in the name for each created resource."
+            }
+        },
+        "workGroupId": {
+            "type": "string",
+            "metadata": {
+                "description": "Identifier of the working group this template is being executed for"
+            }
+        },
+        "location": {
+            "defaultValue": "[resourceGroup().location]",
+            "type": "string",
+            "metadata": {
+                "description": "Location for all resources."
+            }
+        },
+        "integrationServiceEnvironmentSku": {
+            "defaultValue": "Developer",
+            "type": "string",
+            "allowedValues": [
+                "Premium",
+                "Basic",
+                "Developer"
+            ],
+            "metadata": {
+                "description": "The SKU for the Integration Service Environment."
+            }
+        },
+        "accessEndpoint": {
+            "defaultValue": "External",
+            "type": "string",
+            "allowedValues": [
+                "Internal",
+                "External"
+            ],
+            "metadata": {
+                "description": "Indicates what the network configurations access endpoint will be configured as."
+            }
+        },
+        "skuCapacity": {
+            "defaultValue": 0,
+            "type": "int",
+            "metadata": {
+                "description": "The number of scale units for the Integration Service Environment. 0 is the base unit."
+            }
+        },
+        "managedConnectors": {
+            "type": "array",
+            "defaultValue": ["eventhubs", "servicebus", "azureblob"],
+            "metadata": {
+                "description": "The list of managed connectors to deploy into the ISE. The values must be from this list: sql;ftp;azureblob;azurefile;azurequeues;azuretables;sftpwithssh;edifact;x12;servicebus;documentdb;eventhubs;mq;sqldw;db2;smtp;si3270"
+            }
+        },
+        "instance": {
+            "type": "string",
+            "metadata": {
+                "description": "Indicates the specific instance of resources to deploy"
+            }
+        }
+    },
+    "variables": {
+        "baseName": "[concat(parameters('workGroupId'), parameters('location'), parameters('environment'))]",
+        "baseInstancedName": "[concat(variables('baseName'), parameters('instance'))]",
+        "integrationServiceEnvironmentName": "[concat(variables('baseInstancedName'),'ise')]",
+        "integrationAccountName": "[concat(variables('baseInstancedName'),'iact')]",
+        "vnetName": "[concat(variables('baseInstancedName'), 'vnet')]",
+        "vnetResourceGroupName": "[concat(parameters('workGroupId'),'-', parameters('location'), '-', parameters('environment'), '-vnet')]"
+    },
+    "resources": [
+        {
+            "type": "Microsoft.Logic/integrationServiceEnvironments",
+            "apiVersion": "2019-05-01",
+            "name": "[variables('integrationServiceEnvironmentName')]",
+            "location": "[parameters('location')]",
+            "sku": {
+                "name": "[parameters('integrationServiceEnvironmentSku')]",
+                "capacity": "[parameters('skuCapacity')]"
+            },
+            "properties": {
+                "networkConfiguration": {
+                    "accessEndpoint": {
+                        "type": "[parameters('accessEndpoint')]"
+                    },
+                    "subnets": [
+                        {
+                            "id": "[resourceId(variables('vnetResourceGroupName'), 'Microsoft.Network/virtualNetworks/subnets', variables('vnetName'), 'Subnet1')]"
+                        },
+                        {
+                            "id": "[resourceId(variables('vnetResourceGroupName'), 'Microsoft.Network/virtualNetworks/subnets', variables('vnetName'), 'Subnet2')]"
+                        },
+                        {
+                            "id": "[resourceId(variables('vnetResourceGroupName'), 'Microsoft.Network/virtualNetworks/subnets', variables('vnetName'), 'Subnet3')]"
+                        },
+                        {
+                            "id": "[resourceId(variables('vnetResourceGroupName'), 'Microsoft.Network/virtualNetworks/subnets', variables('vnetName'), 'Subnet4')]"
+                        }
+                    ]
+                }
+            }
+        },
+        {
+            "name": "[variables('integrationAccountName')]",
+            "type": "Microsoft.Logic/integrationAccounts",
+            "apiVersion": "2016-06-01",
+            "location": "[parameters('location')]",
+            "dependsOn": [
+                "[resourceId('Microsoft.Logic/integrationServiceEnvironments/', variables('integrationServiceEnvironmentName'))]"
+            ],
+            "properties": {
+                "integrationServiceEnvironment": {
+                    "id": "[resourceId('Microsoft.Logic/integrationServiceEnvironments/', variables('integrationServiceEnvironmentName'))]"
+                }
+            },
+            "sku": {
+                "name": "Standard"
+            },
+            "resources": []
+        },
+        {
+            "apiVersion": "2019-05-01",
+            "type": "Microsoft.Logic/integrationServiceEnvironments/ManagedApis",
+            "location": "[parameters('location')]",
+            "name": "[concat(variables('integrationServiceEnvironmentName'), '/', parameters('managedConnectors')[copyindex()])]",
+            "dependsOn": [
+                "[concat('Microsoft.Logic/integrationServiceEnvironments/', variables('integrationServiceEnvironmentName'))]"
+            ],
+            "copy": {
+                "name": "queueCopy",
+                "count": "[length(parameters('managedConnectors'))]"
+            },
+            "properties": {}
+        }
+    ]
+}
